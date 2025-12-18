@@ -15,8 +15,8 @@ export const toolRegistry: Tool[] = [
     },
     {
         id: 'qr-generator',
-        name: 'QR-Code Generator',
-        description: 'Erstelle QR-Codes mit kurzen URLs für einfaches Teilen und Tracking.',
+        name: 'Link & QR-Code',
+        description: 'Erstelle kurze Links und QR-Codes mit optionalem Login für unbegrenzte Links und Verwaltung.',
         icon: icons.qrcode,
         component: createQrGenerator
     }

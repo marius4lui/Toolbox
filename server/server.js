@@ -1,13 +1,20 @@
-// Toolbox Redirect Server
+// Toolbox Link & QR Code Redirect Server
 // Hosted at: api.qhrd.online
 // Features:
-// - POST /api/create → Create new redirect
+// - POST /api/create → Create new redirect (guest: limited, auth: unlimited)
+// - GET /api/links → Get user's links (auth required)
+// - PUT /api/links/:hash → Update link (auth required)
+// - DELETE /api/links/:hash → Delete link (auth required)
+// - POST /api/auth/register → Register user
+// - POST /api/auth/login → Login user
+// - POST /api/auth/logout → Logout user
 // - GET /:hash → Redirect to target URL
 
 const express = require('express')
 const cors = require('cors')
 const { createClient } = require('@supabase/supabase-js')
 const crypto = require('crypto')
+const rateLimit = require('express-rate-limit')
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -22,13 +29,149 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 app.use(cors())
 app.use(express.json())
 
+// Rate limiting for unauthenticated requests
+const guestLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 10, // 10 requests per minute
+    message: { error: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.ip
+})
+
+// Rate limiting for authenticated requests (more lenient)
+const authLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 100, // 100 requests per minute
+    message: { error: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.headers.authorization || req.ip
+})
+
+// Guest link creation tracker (IP-based, in-memory for simplicity)
+const guestLinks = new Map() // IP -> timestamp
+
 // Generate random hash
 function generateHash(length = 10) {
     return crypto.randomBytes(length).toString('base64url').slice(0, length)
 }
 
+// Auth middleware - extracts user from token if present
+async function optionalAuth(req, res, next) {
+    const authHeader = req.headers.authorization
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7)
+        try {
+            const { data: { user }, error } = await supabase.auth.getUser(token)
+            if (!error && user) {
+                req.user = user
+            }
+        } catch (e) {
+            // Token invalid, continue as guest
+        }
+    }
+    next()
+}
+
+// Required auth middleware
+async function requireAuth(req, res, next) {
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Authentication required' })
+    }
+
+    const token = authHeader.substring(7)
+    try {
+        const { data: { user }, error } = await supabase.auth.getUser(token)
+        if (error || !user) {
+            return res.status(401).json({ error: 'Invalid or expired token' })
+        }
+        req.user = user
+        next()
+    } catch (e) {
+        return res.status(401).json({ error: 'Authentication failed' })
+    }
+}
+
+// ================== AUTH ROUTES ==================
+
+// Register
+app.post('/api/auth/register', guestLimiter, async (req, res) => {
+    try {
+        const { email, password } = req.body
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' })
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password
+        })
+
+        if (error) {
+            return res.status(400).json({ error: error.message })
+        }
+
+        res.json({
+            success: true,
+            user: data.user,
+            session: data.session
+        })
+    } catch (error) {
+        console.error('Register error:', error)
+        res.status(500).json({ error: 'Registration failed' })
+    }
+})
+
+// Login
+app.post('/api/auth/login', guestLimiter, async (req, res) => {
+    try {
+        const { email, password } = req.body
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' })
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        })
+
+        if (error) {
+            return res.status(401).json({ error: error.message })
+        }
+
+        res.json({
+            success: true,
+            user: data.user,
+            session: data.session
+        })
+    } catch (error) {
+        console.error('Login error:', error)
+        res.status(500).json({ error: 'Login failed' })
+    }
+})
+
+// Logout
+app.post('/api/auth/logout', requireAuth, async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization
+        const token = authHeader.substring(7)
+
+        // Note: Supabase handles logout client-side, but we can invalidate server-side
+        res.json({ success: true, message: 'Logged out successfully' })
+    } catch (error) {
+        console.error('Logout error:', error)
+        res.status(500).json({ error: 'Logout failed' })
+    }
+})
+
+// ================== LINK ROUTES ==================
+
 // Create new redirect
-app.post('/api/create', async (req, res) => {
+app.post('/api/create', optionalAuth, async (req, res) => {
     try {
         const { url } = req.body
 
@@ -41,6 +184,25 @@ app.post('/api/create', async (req, res) => {
             new URL(url)
         } catch {
             return res.status(400).json({ error: 'Invalid URL' })
+        }
+
+        const clientIp = req.ip || req.connection.remoteAddress
+
+        // Check if guest (not authenticated)
+        if (!req.user) {
+            // Apply rate limit
+            const lastCreate = guestLinks.get(clientIp)
+            const now = Date.now()
+            const oneHourAgo = now - (60 * 60 * 1000) // 1 hour cooldown
+
+            if (lastCreate && lastCreate > oneHourAgo) {
+                const remainingMs = lastCreate + (60 * 60 * 1000) - now
+                const remainingMin = Math.ceil(remainingMs / 60000)
+                return res.status(429).json({
+                    error: `Guests can only create 1 link per hour. Please login for unlimited links.`,
+                    retryAfterMinutes: remainingMin
+                })
+            }
         }
 
         // Generate unique hash
@@ -60,10 +222,26 @@ app.post('/api/create', async (req, res) => {
             attempts++
         }
 
+        // Calculate expiration (31 days from now)
+        const expiresAt = new Date()
+        expiresAt.setDate(expiresAt.getDate() + 31)
+
         // Insert into database
+        const insertData = {
+            hash,
+            target_url: url,
+            expires_at: expiresAt.toISOString(),
+            is_active: true
+        }
+
+        // Add user_id if authenticated
+        if (req.user) {
+            insertData.user_id = req.user.id
+        }
+
         const { data, error } = await supabase
             .from('redirects')
-            .insert({ hash, target_url: url })
+            .insert(insertData)
             .select()
             .single()
 
@@ -72,11 +250,18 @@ app.post('/api/create', async (req, res) => {
             return res.status(500).json({ error: 'Failed to create redirect' })
         }
 
+        // Track guest link creation
+        if (!req.user) {
+            guestLinks.set(clientIp, Date.now())
+        }
+
         res.json({
             success: true,
             hash: data.hash,
             shortUrl: `https://api.qhrd.online/${data.hash}`,
-            targetUrl: url
+            targetUrl: url,
+            expiresAt: data.expires_at,
+            isGuest: !req.user
         })
 
     } catch (error) {
@@ -85,15 +270,149 @@ app.post('/api/create', async (req, res) => {
     }
 })
 
+// Get user's links
+app.get('/api/links', requireAuth, authLimiter, async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('redirects')
+            .select('*')
+            .eq('user_id', req.user.id)
+            .order('created_at', { ascending: false })
+
+        if (error) {
+            console.error('Supabase error:', error)
+            return res.status(500).json({ error: 'Failed to fetch links' })
+        }
+
+        res.json({
+            success: true,
+            links: data.map(link => ({
+                hash: link.hash,
+                shortUrl: `https://api.qhrd.online/${link.hash}`,
+                targetUrl: link.target_url,
+                clicks: link.clicks,
+                isActive: link.is_active,
+                createdAt: link.created_at,
+                expiresAt: link.expires_at
+            }))
+        })
+    } catch (error) {
+        console.error('Error:', error)
+        res.status(500).json({ error: 'Internal server error' })
+    }
+})
+
+// Update link
+app.put('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
+    try {
+        const { hash } = req.params
+        const { url } = req.body
+
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' })
+        }
+
+        // Validate URL
+        try {
+            new URL(url)
+        } catch {
+            return res.status(400).json({ error: 'Invalid URL' })
+        }
+
+        // Check ownership
+        const { data: existing, error: findError } = await supabase
+            .from('redirects')
+            .select('user_id')
+            .eq('hash', hash)
+            .single()
+
+        if (findError || !existing) {
+            return res.status(404).json({ error: 'Link not found' })
+        }
+
+        if (existing.user_id !== req.user.id) {
+            return res.status(403).json({ error: 'Not authorized to update this link' })
+        }
+
+        // Update
+        const { data, error } = await supabase
+            .from('redirects')
+            .update({ target_url: url })
+            .eq('hash', hash)
+            .select()
+            .single()
+
+        if (error) {
+            console.error('Supabase error:', error)
+            return res.status(500).json({ error: 'Failed to update link' })
+        }
+
+        res.json({
+            success: true,
+            hash: data.hash,
+            shortUrl: `https://api.qhrd.online/${data.hash}`,
+            targetUrl: data.target_url
+        })
+    } catch (error) {
+        console.error('Error:', error)
+        res.status(500).json({ error: 'Internal server error' })
+    }
+})
+
+// Delete link
+app.delete('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
+    try {
+        const { hash } = req.params
+
+        // Check ownership
+        const { data: existing, error: findError } = await supabase
+            .from('redirects')
+            .select('user_id')
+            .eq('hash', hash)
+            .single()
+
+        if (findError || !existing) {
+            return res.status(404).json({ error: 'Link not found' })
+        }
+
+        if (existing.user_id !== req.user.id) {
+            return res.status(403).json({ error: 'Not authorized to delete this link' })
+        }
+
+        // Delete
+        const { error } = await supabase
+            .from('redirects')
+            .delete()
+            .eq('hash', hash)
+
+        if (error) {
+            console.error('Supabase error:', error)
+            return res.status(500).json({ error: 'Failed to delete link' })
+        }
+
+        res.json({ success: true, message: 'Link deleted' })
+    } catch (error) {
+        console.error('Error:', error)
+        res.status(500).json({ error: 'Internal server error' })
+    }
+})
+
+// ================== REDIRECT ROUTE ==================
+
 // Redirect to target URL
 app.get('/:hash', async (req, res) => {
     try {
         const { hash } = req.params
 
+        // Skip API routes
+        if (hash === 'api') {
+            return res.status(404).json({ error: 'Not found' })
+        }
+
         // Lookup redirect
         const { data, error } = await supabase
             .from('redirects')
-            .select('target_url')
+            .select('target_url, is_active, expires_at')
             .eq('hash', hash)
             .single()
 
@@ -106,13 +425,39 @@ app.get('/:hash', async (req, res) => {
           <style>
             body { font-family: system-ui; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
             .container { text-align: center; }
-            h1 { color: #0070f3; }
+            h1 { color: #667eea; }
           </style>
         </head>
         <body>
           <div class="container">
             <h1>404</h1>
-            <p>Redirect not found</p>
+            <p>Link not found</p>
+          </div>
+        </body>
+        </html>
+      `)
+        }
+
+        // Check if expired or inactive
+        const now = new Date()
+        const expiresAt = new Date(data.expires_at)
+
+        if (!data.is_active || expiresAt < now) {
+            return res.status(410).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Link Expired</title>
+          <style>
+            body { font-family: system-ui; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .container { text-align: center; }
+            h1 { color: #f59e0b; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Link Expired</h1>
+            <p>This link is no longer active</p>
           </div>
         </body>
         </html>
@@ -122,8 +467,13 @@ app.get('/:hash', async (req, res) => {
         // Increment click counter (async, don't wait)
         supabase
             .from('redirects')
-            .update({ clicks: supabase.rpc('increment_clicks', { row_hash: hash }) })
+            .update({ clicks: supabase.rpc ? undefined : 1 })
             .eq('hash', hash)
+            .then(() => { })
+            .catch(() => { })
+
+        // Try to call RPC function for proper increment
+        supabase.rpc('increment_clicks', { row_hash: hash })
             .then(() => { })
             .catch(() => { })
 
@@ -140,11 +490,17 @@ app.get('/:hash', async (req, res) => {
 app.get('/', (req, res) => {
     res.json({
         status: 'ok',
-        service: 'Toolbox Redirect Service',
-        version: '1.0.0'
+        service: 'Toolbox Link & QR Code Service',
+        version: '2.0.0',
+        features: [
+            'Link shortening with 31-day expiration',
+            'Optional user authentication',
+            'Link management (view, edit, delete)',
+            'Rate limiting'
+        ]
     })
 })
 
 app.listen(PORT, () => {
-    console.log(`🚀 Toolbox Redirect Server running on port ${PORT}`)
+    console.log(`🚀 Toolbox Link & QR Code Server running on port ${PORT}`)
 })
