@@ -1,5 +1,6 @@
-// Toolbox Link & QR Code Redirect Server
+// Toolbox Link & QR Code API Server
 // Hosted at: api.qhrd.online
+// Redirects are handled by: links.qhrd.online (see redirect-server.js)
 // Features:
 // - POST /api/create → Create new redirect (guest: limited, auth: unlimited)
 // - GET /api/links → Get user's links (auth required)
@@ -8,7 +9,7 @@
 // - POST /api/auth/register → Register user
 // - POST /api/auth/login → Login user
 // - POST /api/auth/logout → Logout user
-// - GET /:hash → Redirect to target URL
+// - GET /api/auth/validate → Validate token
 
 const express = require('express')
 const cors = require('cors')
@@ -168,6 +169,19 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
     }
 })
 
+// Validate token (check if still valid)
+app.get('/api/auth/validate', requireAuth, async (req, res) => {
+    // If we reach here, the token is valid (requireAuth middleware passed)
+    res.json({
+        success: true,
+        valid: true,
+        user: {
+            id: req.user.id,
+            email: req.user.email
+        }
+    })
+})
+
 // ================== LINK ROUTES ==================
 
 // Create new redirect
@@ -258,7 +272,7 @@ app.post('/api/create', optionalAuth, async (req, res) => {
         res.json({
             success: true,
             hash: data.hash,
-            shortUrl: `https://api.qhrd.online/${data.hash}`,
+            shortUrl: `https://links.qhrd.online/${data.hash}`,
             targetUrl: url,
             expiresAt: data.expires_at,
             isGuest: !req.user
@@ -288,7 +302,7 @@ app.get('/api/links', requireAuth, authLimiter, async (req, res) => {
             success: true,
             links: data.map(link => ({
                 hash: link.hash,
-                shortUrl: `https://api.qhrd.online/${link.hash}`,
+                shortUrl: `https://links.qhrd.online/${link.hash}`,
                 targetUrl: link.target_url,
                 clicks: link.clicks,
                 isActive: link.is_active,
@@ -350,7 +364,7 @@ app.put('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
         res.json({
             success: true,
             hash: data.hash,
-            shortUrl: `https://api.qhrd.online/${data.hash}`,
+            shortUrl: `https://links.qhrd.online/${data.hash}`,
             targetUrl: data.target_url
         })
     } catch (error) {
@@ -397,101 +411,15 @@ app.delete('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
     }
 })
 
-// ================== REDIRECT ROUTE ==================
-
-// Redirect to target URL
-app.get('/:hash', async (req, res) => {
-    try {
-        const { hash } = req.params
-
-        // Skip API routes
-        if (hash === 'api') {
-            return res.status(404).json({ error: 'Not found' })
-        }
-
-        // Lookup redirect
-        const { data, error } = await supabase
-            .from('redirects')
-            .select('target_url, is_active, expires_at')
-            .eq('hash', hash)
-            .single()
-
-        if (error || !data) {
-            return res.status(404).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Not Found</title>
-          <style>
-            body { font-family: system-ui; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .container { text-align: center; }
-            h1 { color: #667eea; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>404</h1>
-            <p>Link not found</p>
-          </div>
-        </body>
-        </html>
-      `)
-        }
-
-        // Check if expired or inactive
-        const now = new Date()
-        const expiresAt = new Date(data.expires_at)
-
-        if (!data.is_active || expiresAt < now) {
-            return res.status(410).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Link Expired</title>
-          <style>
-            body { font-family: system-ui; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-            .container { text-align: center; }
-            h1 { color: #f59e0b; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Link Expired</h1>
-            <p>This link is no longer active</p>
-          </div>
-        </body>
-        </html>
-      `)
-        }
-
-        // Increment click counter (async, don't wait)
-        supabase
-            .from('redirects')
-            .update({ clicks: supabase.rpc ? undefined : 1 })
-            .eq('hash', hash)
-            .then(() => { })
-            .catch(() => { })
-
-        // Try to call RPC function for proper increment
-        supabase.rpc('increment_clicks', { row_hash: hash })
-            .then(() => { })
-            .catch(() => { })
-
-        // Redirect
-        res.redirect(302, data.target_url)
-
-    } catch (error) {
-        console.error('Error:', error)
-        res.status(500).send('Internal server error')
-    }
-})
+// Note: Redirect routes have been moved to redirect-server.js (links.qhrd.online)
 
 // Health check
 app.get('/', (req, res) => {
     res.json({
         status: 'ok',
-        service: 'Toolbox Link & QR Code Service',
+        service: 'Toolbox Link & QR Code API',
         version: '2.0.0',
+        redirectService: 'https://links.qhrd.online',
         features: [
             'Link shortening with 31-day expiration',
             'Optional user authentication',

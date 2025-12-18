@@ -1,11 +1,15 @@
 {
-    "name": "toolbox-redirect-server",
-    "version": "1.0.0",
-    "description": "Redirect service for Toolbox QR codes",
+    "name": "toolbox-server",
+    "version": "2.0.0",
+    "description": "API and Redirect services for Toolbox",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
-        "dev": "node server.js"
+        "start:api": "node server.js",
+        "start:redirect": "node redirect-server.js",
+        "dev": "node server.js",
+        "dev:api": "node server.js",
+        "dev:redirect": "node redirect-server.js"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.39.0",

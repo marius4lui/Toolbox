@@ -19,9 +19,10 @@ type AuthListener = (session: Session | null) => void
 class AuthStore {
     private session: Session | null = null
     private listeners: Set<AuthListener> = new Set()
+    private isValidating: boolean = false
 
     constructor() {
-        // Load session from localStorage on init
+        // Load session from localStorage on init and validate
         this.loadSession()
     }
 
@@ -30,9 +31,40 @@ class AuthStore {
             const stored = localStorage.getItem(SESSION_KEY)
             if (stored) {
                 this.session = JSON.parse(stored)
+                // Validate token with server
+                this.validateToken()
             }
         } catch {
             this.session = null
+        }
+    }
+
+    // Validate token with server
+    private async validateToken(): Promise<void> {
+        if (!this.session || this.isValidating) return
+
+        this.isValidating = true
+
+        try {
+            const response = await fetch(`${API_BASE}/api/auth/validate`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.session.access_token}`
+                }
+            })
+
+            if (!response.ok) {
+                // Token is invalid or expired - log out
+                console.log('Token validation failed, logging out')
+                this.session = null
+                this.saveSession()
+                this.notifyListeners()
+            }
+        } catch (error) {
+            console.error('Token validation error:', error)
+            // Network error - don't log out, might just be offline
+        } finally {
+            this.isValidating = false
         }
     }
 
