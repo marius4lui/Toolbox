@@ -1,6 +1,7 @@
 // Image Compressor Tool Component
 import { ImageFile, CompressedImage, CompressOptions } from '../types'
 import { icons } from '../icons'
+import { settingsStore } from '../settingsStore'
 
 interface State {
   originalImage: ImageFile | null
@@ -12,12 +13,16 @@ interface State {
 }
 
 export function createImageCompressor(): HTMLElement {
+  // Get defaults from store
+  const settings = settingsStore.getSettings()
+  const defaults = settings.imageCompressor || { defaultQuality: 80, defaultFormat: 'webp' }
+
   // State
   const state: State = {
     originalImage: null,
     compressedImage: null,
-    quality: 80,
-    format: 'webp',
+    quality: defaults.defaultQuality,
+    format: defaults.defaultFormat as CompressOptions['format'],
     isCompressing: false,
     error: null
   }

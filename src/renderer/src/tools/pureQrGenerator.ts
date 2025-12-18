@@ -1,6 +1,7 @@
 // Pure QR Code Generator Tool Component
 // Generates QR codes for various data types without URL shortening
 import { icons } from '../icons'
+import { settingsStore } from '../settingsStore'
 
 type QRType = 'url' | 'wifi' | 'vcard' | 'email' | 'phone' | 'sms' | 'geo'
 
@@ -63,12 +64,15 @@ const QR_TYPES: { id: QRType; label: string; icon: string }[] = [
 ]
 
 export function createPureQrGenerator(): HTMLElement {
+  const settings = settingsStore.getSettings()
+  const defaultSize = settings.qrGenerator?.defaultSize || 300
+
   const state: State = {
     activeType: 'url',
     qrDataUrl: null,
     qrSvg: null,
     error: null,
-    size: 300,
+    size: defaultSize,
     fgColor: '#ffffff',
     bgColor: '#000000',
     errorCorrection: 'M',
@@ -110,7 +114,7 @@ export function createPureQrGenerator(): HTMLElement {
       <div class="qr-content-grid">
         <div class="qr-input-panel">
           ${renderInputForm()}
-          
+
           <div class="qr-settings">
             <h4 class="qr-settings__title">Einstellungen</h4>
             <div class="qr-settings__grid">
@@ -164,7 +168,7 @@ export function createPureQrGenerator(): HTMLElement {
             </div>
           ` : `
             <div class="qr-placeholder">
-              <div class="qr-placeholder__icon">${icons.qrcode}</div>
+              <div class="qr-placeholder__icon">${icons.qrcode || icons.image}</div>
               <p>Fülle die Felder aus und klicke auf "QR-Code generieren"</p>
             </div>
           `}
@@ -466,7 +470,7 @@ export function createPureQrGenerator(): HTMLElement {
             </div>
           </div>
           <div class="qr-form-group">
-            <label>Firma/Organisation</label>
+            <label>Firma / Organisation</label>
             <input type="text" id="vcard-org" value="${escapeHtml(state.vcardOrg)}" placeholder="Firma GmbH">
           </div>
           <div class="qr-form-group">

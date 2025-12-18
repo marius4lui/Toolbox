@@ -26,7 +26,12 @@ const api = {
     // Window controls
     minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
     maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
-    closeWindow: () => ipcRenderer.invoke('window:close')
+    closeWindow: () => ipcRenderer.invoke('window:close'),
+
+    // Settings
+    getSettings: () => ipcRenderer.invoke('settings:get'),
+    setSetting: (key: string, value: any) => ipcRenderer.invoke('settings:set', key, value),
+    resetSettings: () => ipcRenderer.invoke('settings:reset')
 }
 
 // Expose APIs to renderer

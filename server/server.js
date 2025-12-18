@@ -64,9 +64,18 @@ async function optionalAuth(req, res, next) {
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7)
         try {
-            const { data: { user }, error } = await supabase.auth.getUser(token)
+            // Create authenticated client
+            const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                global: {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            })
+            const { data: { user }, error } = await client.auth.getUser()
             if (!error && user) {
                 req.user = user
+                req.supabase = client
             }
         } catch (e) {
             // Token invalid, continue as guest
@@ -84,7 +93,16 @@ async function requireAuth(req, res, next) {
 
     const token = authHeader.substring(7)
     try {
-        const { data: { user }, error } = await supabase.auth.getUser(token)
+        // Create authenticated client for RLS
+        req.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            global: {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        })
+
+        const { data: { user }, error } = await req.supabase.auth.getUser()
         if (error || !user) {
             return res.status(401).json({ error: 'Invalid or expired token' })
         }
@@ -169,6 +187,35 @@ app.post('/api/auth/logout', requireAuth, async (req, res) => {
     }
 })
 
+// Delete Account
+app.delete('/api/auth/delete-account', requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.id
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+        if (!serviceRoleKey) {
+            console.error('Missing SUPABASE_SERVICE_ROLE_KEY')
+            return res.status(500).json({ error: 'Server configuration error: Unable to process deletion' })
+        }
+
+        const supabaseAdmin = createClient(SUPABASE_URL, serviceRoleKey, {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false
+            }
+        })
+
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+
+        if (error) throw error
+
+        res.json({ success: true, message: 'Account deleted successfully' })
+    } catch (error) {
+        console.error('Delete account error:', error)
+        res.status(500).json({ error: 'Failed to delete account: ' + error.message })
+    }
+})
+
 // Validate token (check if still valid)
 app.get('/api/auth/validate', requireAuth, async (req, res) => {
     // If we reach here, the token is valid (requireAuth middleware passed)
@@ -180,6 +227,37 @@ app.get('/api/auth/validate', requireAuth, async (req, res) => {
             email: req.user.email
         }
     })
+})
+
+// Change Password
+app.put('/api/auth/change-password', requireAuth, authLimiter, async (req, res) => {
+    try {
+        const { password } = req.body
+        const { error } = await req.supabase.auth.updateUser({ password })
+        if (error) return res.status(400).json({ error: error.message })
+        res.json({ success: true })
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' })
+    }
+})
+
+// Change Email
+app.put('/api/auth/change-email', requireAuth, authLimiter, async (req, res) => {
+    try {
+        const { email } = req.body
+        const { error } = await req.supabase.auth.updateUser({ email })
+        if (error) return res.status(400).json({ error: error.message })
+        res.json({ success: true })
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' })
+    }
+})
+
+// Delete Account
+app.delete('/api/auth/delete-account', requireAuth, authLimiter, async (req, res) => {
+    // Note: This requires Service Role or matching RLS policies
+    // JS Client SDK cannot delete self directly usually
+    res.status(501).json({ error: 'Account deletion pending implementation (needs admin key)' })
 })
 
 // ================== LINK ROUTES ==================
@@ -253,7 +331,7 @@ app.post('/api/create', optionalAuth, async (req, res) => {
             insertData.user_id = req.user.id
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await (req.supabase || supabase)
             .from('redirects')
             .insert(insertData)
             .select()
@@ -287,7 +365,7 @@ app.post('/api/create', optionalAuth, async (req, res) => {
 // Get user's links
 app.get('/api/links', requireAuth, authLimiter, async (req, res) => {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await req.supabase
             .from('redirects')
             .select('*')
             .eq('user_id', req.user.id)
@@ -334,7 +412,7 @@ app.put('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
         }
 
         // Check ownership
-        const { data: existing, error: findError } = await supabase
+        const { data: existing, error: findError } = await req.supabase
             .from('redirects')
             .select('user_id')
             .eq('hash', hash)
@@ -349,7 +427,7 @@ app.put('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
         }
 
         // Update
-        const { data, error } = await supabase
+        const { data, error } = await req.supabase
             .from('redirects')
             .update({ target_url: url })
             .eq('hash', hash)
@@ -379,7 +457,7 @@ app.delete('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
         const { hash } = req.params
 
         // Check ownership
-        const { data: existing, error: findError } = await supabase
+        const { data: existing, error: findError } = await req.supabase
             .from('redirects')
             .select('user_id')
             .eq('hash', hash)
@@ -394,7 +472,7 @@ app.delete('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
         }
 
         // Delete
-        const { error } = await supabase
+        const { error } = await req.supabase
             .from('redirects')
             .delete()
             .eq('hash', hash)

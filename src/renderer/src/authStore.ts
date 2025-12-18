@@ -203,6 +203,70 @@ class AuthStore {
         this.saveSession()
         this.notifyListeners()
     }
+
+    // Account Management
+    async changePassword(password: string): Promise<{ success: boolean; error?: string }> {
+        if (!this.session) return { success: false, error: 'Nicht eingeloggt' }
+        try {
+            const response = await fetch(`${API_BASE}/api/auth/change-password`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.session.access_token}`
+                },
+                body: JSON.stringify({ password })
+            })
+            const data = await response.json()
+            return response.ok ? { success: true } : { success: false, error: data.error }
+        } catch {
+            return { success: false, error: 'Verbindungsfehler' }
+        }
+    }
+
+    async changeEmail(email: string): Promise<{ success: boolean; error?: string }> {
+        if (!this.session) return { success: false, error: 'Nicht eingeloggt' }
+        try {
+            const response = await fetch(`${API_BASE}/api/auth/change-email`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.session.access_token}`
+                },
+                body: JSON.stringify({ email })
+            })
+            const data = await response.json()
+            if (response.ok) {
+                // Update local session email
+                this.session.user.email = email
+                this.saveSession()
+                this.notifyListeners()
+                return { success: true }
+            }
+            return { success: false, error: data.error }
+        } catch {
+            return { success: false, error: 'Verbindungsfehler' }
+        }
+    }
+
+    async deleteAccount(): Promise<{ success: boolean; error?: string }> {
+        if (!this.session) return { success: false, error: 'Nicht eingeloggt' }
+        try {
+            const response = await fetch(`${API_BASE}/api/auth/delete-account`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.session.access_token}`
+                }
+            })
+            const data = await response.json()
+            if (response.ok) {
+                this.logout()
+                return { success: true }
+            }
+            return { success: false, error: data.error }
+        } catch {
+            return { success: false, error: 'Verbindungsfehler' }
+        }
+    }
 }
 
 // Singleton instance

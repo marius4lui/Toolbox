@@ -3,6 +3,18 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import sharp from 'sharp'
 import { readFile, writeFile } from 'fs/promises'
+import Store from 'electron-store'
+
+const store = new Store({
+    defaults: {
+        theme: 'system',
+        language: 'de',
+        imageCompressor: {
+            defaultQuality: 80,
+            defaultFormat: 'jpeg'
+        }
+    }
+})
 
 function createWindow(): void {
     const mainWindow = new BrowserWindow({
@@ -124,6 +136,19 @@ ipcMain.handle('image:compress', async (_event, options: {
 ipcMain.handle('file:save', async (_event, options: { filePath: string; data: string }) => {
     const buffer = Buffer.from(options.data, 'base64')
     await writeFile(options.filePath, buffer)
+    return true
+})
+
+// Settings Handlers
+ipcMain.handle('settings:get', () => store.store)
+
+ipcMain.handle('settings:set', (_event, key: string, value: any) => {
+    store.set(key, value)
+    return true
+})
+
+ipcMain.handle('settings:reset', () => {
+    store.clear()
     return true
 })
 

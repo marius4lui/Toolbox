@@ -16,6 +16,7 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
+    "electron-store": "8.2.0",
     "sharp": "^0.33.5"
   },
   "devDependencies": {

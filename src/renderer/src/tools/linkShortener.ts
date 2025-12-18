@@ -136,31 +136,35 @@ export function createLinkShortener(): HTMLElement {
           color: var(--accent-primary);
         }
         .link-tabs {
-          display: flex;
-          gap: 0.5rem;
-          border-bottom: 1px solid var(--border-primary);
-          padding-bottom: 0.5rem;
+          display: inline-flex;
+          gap: 0;
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border-primary);
+          border-radius: 12px;
+          padding: 4px;
         }
         .link-tab {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.75rem 1.5rem;
+          padding: 0.625rem 1.25rem;
           background: transparent;
           border: none;
-          border-radius: 8px 8px 0 0;
+          border-radius: 8px;
           color: var(--text-secondary);
           cursor: pointer;
           transition: all 0.2s;
           font-size: 0.875rem;
+          font-weight: 500;
         }
-        .link-tab:hover:not(:disabled) {
-          background: var(--bg-tertiary);
+        .link-tab:hover:not(:disabled):not(.link-tab--active) {
           color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.05);
         }
         .link-tab--active {
           background: var(--accent-primary);
           color: white;
+          box-shadow: 0 2px 8px rgba(0, 112, 243, 0.3);
         }
         .link-tab:disabled {
           opacity: 0.5;
