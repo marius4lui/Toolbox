@@ -1,5 +1,6 @@
 // Link & QR Code Generator Tool Component
 import { icons } from '../icons'
+import { authStore } from '../authStore'
 
 interface Link {
   hash: string
@@ -11,24 +12,7 @@ interface Link {
   expiresAt: string
 }
 
-interface Session {
-  access_token: string
-  user: {
-    id: string
-    email: string
-  }
-}
-
 interface State {
-  // Auth
-  session: Session | null
-  authOpen: boolean
-  authTab: 'login' | 'register'
-  authEmail: string
-  authPassword: string
-  authLoading: boolean
-  authError: string | null
-
   // Tabs
   activeTab: 'create' | 'mylinks'
 
@@ -55,20 +39,9 @@ interface State {
 // Set VITE_API_URL=http://localhost:3000 in .env for local development
 const API_BASE = import.meta.env.VITE_API_URL || 'https://api.qhrd.online'
 
-// Storage keys
-const SESSION_KEY = 'toolbox_session'
-
 export function createQrGenerator(): HTMLElement {
-  // State
+  // State (auth now comes from global authStore)
   const state: State = {
-    session: loadSession(),
-    authOpen: false,
-    authTab: 'login',
-    authEmail: '',
-    authPassword: '',
-    authLoading: false,
-    authError: null,
-
     activeTab: 'create',
 
     targetUrl: '',
@@ -91,95 +64,43 @@ export function createQrGenerator(): HTMLElement {
   const container = document.createElement('div')
   container.className = 'qr-generator fade-in'
 
-  // Load session from localStorage
-  function loadSession(): Session | null {
-    try {
-      const stored = localStorage.getItem(SESSION_KEY)
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
-    }
-  }
+  // Subscribe to auth changes
+  const unsubscribe = authStore.subscribe(() => {
+    render()
+  })
 
-  // Save session to localStorage
-  function saveSession(session: Session | null): void {
-    if (session) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-    } else {
-      localStorage.removeItem(SESSION_KEY)
-    }
+  // Cleanup on unmount (not perfect in vanilla JS but helps)
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.removedNodes.forEach((node) => {
+        if (node === container) {
+          unsubscribe()
+          observer.disconnect()
+        }
+      })
+    })
+  })
+  if (container.parentNode) {
+    observer.observe(container.parentNode, { childList: true })
   }
 
   // Render function
   function render(): void {
-    container.innerHTML = `
-      <!-- Auth Section -->
-      <div class="auth-section">
-        <div class="auth-header" id="auth-toggle">
-          <div class="auth-header__left">
-            ${icons.user}
-            ${state.session
-        ? `<span>Eingeloggt als</span>`
-        : `<span>Login für unbegrenzte Links</span>`
-      }
-          </div>
-          ${state.session ? `
-            <div class="auth-user">
-              <span class="auth-user__email">${escapeHtml(state.session.user.email)}</span>
-              <button class="btn btn--secondary btn--small" id="logout-btn">Logout</button>
-            </div>
-          ` : `
-            <span class="auth-header__icon ${state.authOpen ? 'auth-header__icon--open' : ''}">
-              ${icons.chevronDown}
-            </span>
-          `}
-        </div>
-        
-        ${!state.session ? `
-          <div class="auth-content ${state.authOpen ? 'auth-content--open' : ''}">
-            <div class="auth-tabs">
-              <button class="auth-tab ${state.authTab === 'login' ? 'auth-tab--active' : ''}" data-tab="login">Login</button>
-              <button class="auth-tab ${state.authTab === 'register' ? 'auth-tab--active' : ''}" data-tab="register">Registrieren</button>
-            </div>
-            
-            <form class="auth-form" id="auth-form">
-              <input 
-                type="email" 
-                class="auth-input" 
-                placeholder="E-Mail" 
-                id="auth-email"
-                value="${escapeHtml(state.authEmail)}"
-                required
-              >
-              <input 
-                type="password" 
-                class="auth-input" 
-                placeholder="Passwort" 
-                id="auth-password"
-                value=""
-                minlength="6"
-                required
-              >
-              ${state.authError ? `<div class="status status--error">${state.authError}</div>` : ''}
-              <button type="submit" class="btn btn--primary" ${state.authLoading ? 'disabled' : ''}>
-                ${state.authLoading ? '<div class="spinner"></div>' : (state.authTab === 'login' ? 'Einloggen' : 'Registrieren')}
-              </button>
-            </form>
-          </div>
-        ` : ''}
-      </div>
+    const session = authStore.getSession()
+    const user = authStore.getUser()
 
+    container.innerHTML = `
       <!-- Tabs -->
       <div class="link-tabs">
         <button class="link-tab ${state.activeTab === 'create' ? 'link-tab--active' : ''}" data-linktab="create">
           Link erstellen
         </button>
-        <button class="link-tab ${state.activeTab === 'mylinks' ? 'link-tab--active' : ''}" data-linktab="mylinks" ${!state.session ? 'disabled title="Login erforderlich"' : ''}>
-          Meine Links ${state.session ? `(${state.links.length})` : '🔒'}
+        <button class="link-tab ${state.activeTab === 'mylinks' ? 'link-tab--active' : ''}" data-linktab="mylinks" ${!session ? 'disabled title="Login erforderlich"' : ''}>
+          Meine Links ${session ? `(${state.links.length})` : '🔒'}
         </button>
       </div>
 
-      ${state.activeTab === 'create' ? renderCreateTab() : renderMyLinksTab()}
+      ${state.activeTab === 'create' ? renderCreateTab(session) : renderMyLinksTab(session)}
 
       ${state.editingLink ? renderEditModal() : ''}
     `
@@ -187,7 +108,7 @@ export function createQrGenerator(): HTMLElement {
     attachEventListeners()
   }
 
-  function renderCreateTab(): string {
+  function renderCreateTab(session: ReturnType<typeof authStore.getSession>): string {
     return `
       <!-- Create Link Section -->
       <div class="qr-input-section">
@@ -209,10 +130,10 @@ export function createQrGenerator(): HTMLElement {
         </div>
       </div>
 
-      ${!state.session ? `
+      ${!session ? `
         <div class="guest-warning">
           ${icons.alertTriangle}
-          <span>Als Gast kannst du nur 1 Link pro Stunde erstellen. Login für unbegrenzte Links.</span>
+          <span>Als Gast kannst du nur 1 Link pro Stunde erstellen. <a href="#" id="login-link" style="color: var(--accent-primary);">Jetzt einloggen</a> für unbegrenzte Links.</span>
         </div>
       ` : ''}
 
@@ -258,8 +179,8 @@ export function createQrGenerator(): HTMLElement {
     `
   }
 
-  function renderMyLinksTab(): string {
-    if (!state.session) {
+  function renderMyLinksTab(session: ReturnType<typeof authStore.getSession>): string {
+    if (!session) {
       return `
         <div class="links-empty">
           <p>Bitte logge dich ein, um deine Links zu verwalten.</p>
@@ -365,52 +286,19 @@ export function createQrGenerator(): HTMLElement {
 
   // Event listeners
   function attachEventListeners(): void {
-    // Auth toggle
-    const authToggle = container.querySelector('#auth-toggle') as HTMLElement
-    authToggle?.addEventListener('click', (e) => {
-      // Don't toggle if clicking logout button
-      if ((e.target as HTMLElement).id === 'logout-btn') return
-      if (!state.session) {
-        state.authOpen = !state.authOpen
-        render()
-      }
-    })
-
-    // Logout button
-    const logoutBtn = container.querySelector('#logout-btn') as HTMLButtonElement
-    logoutBtn?.addEventListener('click', (e) => {
-      e.stopPropagation()
-      handleLogout()
-    })
-
-    // Auth tabs
-    container.querySelectorAll('.auth-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        state.authTab = (tab as HTMLElement).dataset.tab as 'login' | 'register'
-        state.authError = null
-        render()
-      })
-    })
-
-    // Auth form
-    const authForm = container.querySelector('#auth-form') as HTMLFormElement
-    authForm?.addEventListener('submit', handleAuth)
-
-    const authEmailInput = container.querySelector('#auth-email') as HTMLInputElement
-    authEmailInput?.addEventListener('input', () => {
-      state.authEmail = authEmailInput.value
-    })
-
-    const authPasswordInput = container.querySelector('#auth-password') as HTMLInputElement
-    authPasswordInput?.addEventListener('input', () => {
-      state.authPassword = authPasswordInput.value
+    // Login link
+    const loginLink = container.querySelector('#login-link') as HTMLAnchorElement
+    loginLink?.addEventListener('click', (e) => {
+      e.preventDefault()
+      // Navigate to login view - dispatch custom event
+      window.dispatchEvent(new CustomEvent('toolbox:navigate', { detail: { view: 'login' } }))
     })
 
     // Link tabs
     container.querySelectorAll('.link-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         const newTab = (tab as HTMLElement).dataset.linktab as 'create' | 'mylinks'
-        if (newTab === 'mylinks' && !state.session) return
+        if (newTab === 'mylinks' && !authStore.isLoggedIn()) return
         state.activeTab = newTab
         if (newTab === 'mylinks') {
           loadLinks()
@@ -511,78 +399,10 @@ export function createQrGenerator(): HTMLElement {
     })
   }
 
-  // Auth handlers
-  async function handleAuth(e: Event): Promise<void> {
-    e.preventDefault()
-    if (state.authLoading) return
-
-    state.authLoading = true
-    state.authError = null
-    render()
-
-    try {
-      const endpoint = state.authTab === 'login' ? '/api/auth/login' : '/api/auth/register'
-      const response = await fetch(`${API_BASE}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: state.authEmail,
-          password: state.authPassword
-        })
-      })
-
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Server nicht erreichbar. Bitte später erneut versuchen.')
-      }
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Authentifizierung fehlgeschlagen')
-      }
-
-      if (!data.session || !data.user) {
-        throw new Error('Ungültige Server-Antwort')
-      }
-
-      state.session = {
-        access_token: data.session.access_token,
-        user: {
-          id: data.user.id,
-          email: data.user.email
-        }
-      }
-      saveSession(state.session)
-      state.authOpen = false
-      state.authEmail = ''
-      state.authPassword = ''
-
-    } catch (error) {
-      const errorMessage = (error as Error).message
-      if (errorMessage.includes("Unexpected token '<'") || errorMessage.includes('Unexpected token')) {
-        state.authError = 'Server nicht erreichbar. Bitte stelle sicher, dass der Server läuft.'
-      } else {
-        state.authError = errorMessage
-      }
-    } finally {
-      state.authLoading = false
-      render()
-    }
-  }
-
-  async function handleLogout(): Promise<void> {
-    state.session = null
-    saveSession(null)
-    state.links = []
-    state.activeTab = 'create'
-    render()
-  }
-
   // Load user links
   async function loadLinks(): Promise<void> {
-    if (!state.session) return
+    const token = authStore.getToken()
+    if (!token) return
 
     state.linksLoading = true
     render()
@@ -590,7 +410,7 @@ export function createQrGenerator(): HTMLElement {
     try {
       const response = await fetch(`${API_BASE}/api/links`, {
         headers: {
-          'Authorization': `Bearer ${state.session.access_token}`
+          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -633,8 +453,9 @@ export function createQrGenerator(): HTMLElement {
         'Content-Type': 'application/json'
       }
 
-      if (state.session) {
-        headers['Authorization'] = `Bearer ${state.session.access_token}`
+      const token = authStore.getToken()
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
       }
 
       const response = await fetch(`${API_BASE}/api/create`, {
@@ -669,7 +490,8 @@ export function createQrGenerator(): HTMLElement {
   // Edit link
   async function handleEditSubmit(e: Event): Promise<void> {
     e.preventDefault()
-    if (!state.editingLink || !state.session) return
+    const token = authStore.getToken()
+    if (!state.editingLink || !token) return
 
     try {
       new URL(state.editUrl)
@@ -682,7 +504,7 @@ export function createQrGenerator(): HTMLElement {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${state.session.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ url: state.editUrl })
       })
@@ -702,13 +524,14 @@ export function createQrGenerator(): HTMLElement {
 
   // Delete link
   async function handleDeleteLink(hash: string): Promise<void> {
-    if (!state.session) return
+    const token = authStore.getToken()
+    if (!token) return
 
     try {
       const response = await fetch(`${API_BASE}/api/links/${hash}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${state.session.access_token}`
+          'Authorization': `Bearer ${token}`
         }
       })
 

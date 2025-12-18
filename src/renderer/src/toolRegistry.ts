@@ -1,6 +1,7 @@
 // Tool Registry - Extensible architecture for adding new tools
 import { Tool } from './types'
 import { createImageCompressor } from './tools/imageCompressor'
+import { createImageConverter } from './tools/imageConverter'
 import { createQrGenerator } from './tools/qrGenerator'
 import { icons } from './icons'
 
@@ -12,6 +13,13 @@ export const toolRegistry: Tool[] = [
         description: 'Komprimiere Bilder ohne sichtbaren Qualitätsverlust. Unterstützt JPEG, PNG, WebP und AVIF.',
         icon: icons.compress,
         component: createImageCompressor
+    },
+    {
+        id: 'image-converter',
+        name: 'Format-Konverter',
+        description: 'Konvertiere Bilder zwischen Formaten: JPEG, PNG, WebP, AVIF.',
+        icon: icons.image,
+        component: createImageConverter
     },
     {
         id: 'qr-generator',

@@ -15,6 +15,7 @@ function createWindow(): void {
         backgroundColor: '#000000',
         titleBarStyle: 'hiddenInset',
         frame: process.platform === 'darwin',
+        icon: join(__dirname, '../../resources/icon.png'),
         webPreferences: {
             preload: join(__dirname, '../preload/index.js'),
             sandbox: false,
