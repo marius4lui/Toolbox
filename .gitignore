@@ -1,7 +1,7 @@
 # Abhängigkeiten (Niemals einchecken, da sehr groß)
 node_modules/
 jspm_packages/
-
+server/node_modules/
 # Build-Verzeichnisse (werden automatisch generiert)
 dist/
 build/
