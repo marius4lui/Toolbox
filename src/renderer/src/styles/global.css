@@ -445,6 +445,11 @@ body {
   gap: var(--spacing-lg);
 }
 
+.preview--single {
+  grid-template-columns: 1fr;
+  max-width: 450px;
+}
+
 .preview__item {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);

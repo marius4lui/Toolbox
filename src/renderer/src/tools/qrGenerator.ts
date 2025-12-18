@@ -12,7 +12,7 @@ interface State {
 }
 
 // API Base URL for the redirect service
-const API_BASE = 'https://toolbox.qhrd.online'
+const API_BASE = 'https://api.qhrd.online'
 
 export function createQrGenerator(): HTMLElement {
     // State

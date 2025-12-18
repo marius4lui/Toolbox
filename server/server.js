@@ -1,5 +1,5 @@
 // Toolbox Redirect Server
-// Hosted at: toolbox.qhrd.online
+// Hosted at: api.qhrd.online
 // Features:
 // - POST /api/create → Create new redirect
 // - GET /:hash → Redirect to target URL
@@ -75,7 +75,7 @@ app.post('/api/create', async (req, res) => {
         res.json({
             success: true,
             hash: data.hash,
-            shortUrl: `https://toolbox.qhrd.online/${data.hash}`,
+            shortUrl: `https://api.qhrd.online/${data.hash}`,
             targetUrl: url
         })
 

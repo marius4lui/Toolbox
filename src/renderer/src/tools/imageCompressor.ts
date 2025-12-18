@@ -63,18 +63,18 @@ export function createImageCompressor(): HTMLElement {
             </div>
           </div>
         </div>
-
-        <!-- Preview -->
-        ${state.compressedImage ? `
-          <div class="preview">
-            <div class="preview__item">
-              <span class="preview__label">Original</span>
-              <img class="preview__image" src="data:${getMimeType(state.originalImage.format || 'png')};base64,${state.originalImage.buffer}" alt="Original">
-              <div class="preview__stats">
-                <span class="preview__size">${formatBytes(state.originalImage.size)}</span>
-                <span>${state.originalImage.width}×${state.originalImage.height}</span>
-              </div>
+        
+        <!-- Original Image Preview (always shown when image is loaded) -->
+        <div class="preview preview--single">
+          <div class="preview__item">
+            <span class="preview__label">Original</span>
+            <img class="preview__image" src="data:${getMimeType(state.originalImage.format)};base64,${state.originalImage.buffer}" alt="Original" onerror="this.style.display='none'; console.error('Image load error, format:', '${state.originalImage.format}')">
+            <div class="preview__stats">
+              <span class="preview__size">${formatBytes(state.originalImage.size)}</span>
+              <span>${state.originalImage.width}×${state.originalImage.height} • ${state.originalImage.format?.toUpperCase() || 'Unbekannt'}</span>
             </div>
+          </div>
+          ${state.compressedImage ? `
             <div class="preview__item">
               <span class="preview__label">Komprimiert</span>
               <img class="preview__image" src="data:${getMimeType(state.compressedImage.format)};base64,${state.compressedImage.buffer}" alt="Compressed">
@@ -83,8 +83,8 @@ export function createImageCompressor(): HTMLElement {
                 <span class="preview__savings">-${calculateSavings(state.originalImage.size, state.compressedImage.size)}%</span>
               </div>
             </div>
-          </div>
-        ` : ''}
+          ` : ''}
+        </div>
 
         ${state.error ? `
           <div class="status status--error">${state.error}</div>
@@ -301,7 +301,14 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary)
 }
 
-function getMimeType(format: string): string {
+function getMimeType(format: string | undefined): string {
+  if (!format) {
+    console.warn('getMimeType: format is undefined, defaulting to png')
+    return 'image/png'
+  }
+
+  const normalizedFormat = format.toLowerCase().trim()
+
   const mimeTypes: Record<string, string> = {
     'jpg': 'image/jpeg',
     'jpeg': 'image/jpeg',
@@ -309,7 +316,31 @@ function getMimeType(format: string): string {
     'webp': 'image/webp',
     'gif': 'image/gif',
     'avif': 'image/avif',
-    'svg': 'image/svg+xml'
+    'svg': 'image/svg+xml',
+    'svg+xml': 'image/svg+xml',
+    'bmp': 'image/bmp',
+    'tiff': 'image/tiff',
+    'tif': 'image/tiff',
+    'heic': 'image/heic',
+    'heif': 'image/heif'
   }
-  return mimeTypes[format.toLowerCase()] || `image/${format}`
+
+  const result = mimeTypes[normalizedFormat] || `image/${normalizedFormat}`
+  console.log(`getMimeType: ${format} -> ${result}`)
+  return result
+}
+
+// Get suggested output format based on input format
+function getSuggestedFormat(inputFormat: string | undefined): 'jpeg' | 'png' | 'webp' | 'avif' {
+  if (!inputFormat) return 'webp'
+
+  const format = inputFormat.toLowerCase()
+
+  // Keep PNG for images that might have transparency
+  if (format === 'png' || format === 'gif') {
+    return 'png'
+  }
+
+  // Default to WebP for best compression
+  return 'webp'
 }
