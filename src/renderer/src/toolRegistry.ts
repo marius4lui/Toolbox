@@ -2,7 +2,8 @@
 import { Tool } from './types'
 import { createImageCompressor } from './tools/imageCompressor'
 import { createImageConverter } from './tools/imageConverter'
-import { createQrGenerator } from './tools/qrGenerator'
+import { createLinkShortener } from './tools/linkShortener'
+import { createPureQrGenerator } from './tools/pureQrGenerator'
 import { icons } from './icons'
 
 // Registry of all available tools
@@ -22,11 +23,18 @@ export const toolRegistry: Tool[] = [
         component: createImageConverter
     },
     {
+        id: 'link-shortener',
+        name: 'Link Weiterleiter',
+        description: 'Erstelle kurze Links mit 31-Tage Gültigkeit. Login für unbegrenzte Links und Wiederherstellung abgelaufener Links.',
+        icon: icons.link,
+        component: createLinkShortener
+    },
+    {
         id: 'qr-generator',
-        name: 'Link & QR-Code',
-        description: 'Erstelle kurze Links und QR-Codes mit optionalem Login für unbegrenzte Links und Verwaltung.',
+        name: 'QR Code Generator',
+        description: 'Erstelle QR-Codes für URLs, WiFi, Kontakte, E-Mails, Telefon, SMS und Standorte mit Farbanpassung.',
         icon: icons.qrcode,
-        component: createQrGenerator
+        component: createPureQrGenerator
     }
     // Future tools can be added here
 ]

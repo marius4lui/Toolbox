@@ -411,6 +411,59 @@ app.delete('/api/links/:hash', requireAuth, authLimiter, async (req, res) => {
     }
 })
 
+// Restore expired link (extend by 31 days)
+app.post('/api/links/:hash/restore', requireAuth, authLimiter, async (req, res) => {
+    try {
+        const { hash } = req.params
+
+        // Check ownership
+        const { data: existing, error: findError } = await supabase
+            .from('redirects')
+            .select('user_id')
+            .eq('hash', hash)
+            .single()
+
+        if (findError || !existing) {
+            return res.status(404).json({ error: 'Link not found' })
+        }
+
+        if (existing.user_id !== req.user.id) {
+            return res.status(403).json({ error: 'Not authorized to restore this link' })
+        }
+
+        // Calculate new expiration (31 days from now)
+        const newExpiresAt = new Date()
+        newExpiresAt.setDate(newExpiresAt.getDate() + 31)
+
+        // Restore link
+        const { data, error } = await supabase
+            .from('redirects')
+            .update({
+                is_active: true,
+                expires_at: newExpiresAt.toISOString()
+            })
+            .eq('hash', hash)
+            .select()
+            .single()
+
+        if (error) {
+            console.error('Supabase error:', error)
+            return res.status(500).json({ error: 'Failed to restore link' })
+        }
+
+        res.json({
+            success: true,
+            message: 'Link restored',
+            hash: data.hash,
+            shortUrl: `https://links.qhrd.online/${data.hash}`,
+            expiresAt: data.expires_at
+        })
+    } catch (error) {
+        console.error('Error:', error)
+        res.status(500).json({ error: 'Internal server error' })
+    }
+})
+
 // Note: Redirect routes have been moved to redirect-server.js (links.qhrd.online)
 
 // Health check
