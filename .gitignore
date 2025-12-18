@@ -1,0 +1,29 @@
+# Abhängigkeiten (Niemals einchecken, da sehr groß)
+node_modules/
+jspm_packages/
+
+# Build-Verzeichnisse (werden automatisch generiert)
+dist/
+build/
+.next/
+.nuxt/
+out/
+
+# Umgebungsvariablen & Geheimnisse (Sicherheit!)
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Editor & OS spezifisch (Optional, oft global ignoriert)
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
