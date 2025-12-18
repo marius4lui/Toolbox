@@ -35,8 +35,8 @@ const guestLimiter = rateLimit({
     max: 10, // 10 requests per minute
     message: { error: 'Too many requests, please try again later' },
     standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => req.ip
+    legacyHeaders: false
+    // Uses default IP-based key generator which handles IPv6 properly
 })
 
 // Rate limiting for authenticated requests (more lenient)
@@ -45,8 +45,8 @@ const authLimiter = rateLimit({
     max: 100, // 100 requests per minute
     message: { error: 'Too many requests, please try again later' },
     standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: (req) => req.headers.authorization || req.ip
+    legacyHeaders: false
+    // Uses default IP-based key generator
 })
 
 // Guest link creation tracker (IP-based, in-memory for simplicity)

@@ -2,125 +2,126 @@
 import { icons } from '../icons'
 
 interface Link {
-    hash: string
-    shortUrl: string
-    targetUrl: string
-    clicks: number
-    isActive: boolean
-    createdAt: string
-    expiresAt: string
+  hash: string
+  shortUrl: string
+  targetUrl: string
+  clicks: number
+  isActive: boolean
+  createdAt: string
+  expiresAt: string
 }
 
 interface Session {
-    access_token: string
-    user: {
-        id: string
-        email: string
-    }
+  access_token: string
+  user: {
+    id: string
+    email: string
+  }
 }
 
 interface State {
-    // Auth
-    session: Session | null
-    authOpen: boolean
-    authTab: 'login' | 'register'
-    authEmail: string
-    authPassword: string
-    authLoading: boolean
-    authError: string | null
+  // Auth
+  session: Session | null
+  authOpen: boolean
+  authTab: 'login' | 'register'
+  authEmail: string
+  authPassword: string
+  authLoading: boolean
+  authError: string | null
 
-    // Tabs
-    activeTab: 'create' | 'mylinks'
+  // Tabs
+  activeTab: 'create' | 'mylinks'
 
-    // Create Link
-    targetUrl: string
-    shortUrl: string | null
-    hash: string | null
-    qrDataUrl: string | null
-    expiresAt: string | null
-    isGenerating: boolean
-    error: string | null
-    copied: boolean
+  // Create Link
+  targetUrl: string
+  shortUrl: string | null
+  hash: string | null
+  qrDataUrl: string | null
+  expiresAt: string | null
+  isGenerating: boolean
+  error: string | null
+  copied: boolean
 
-    // My Links
-    links: Link[]
-    linksLoading: boolean
+  // My Links
+  links: Link[]
+  linksLoading: boolean
 
-    // Edit Modal
-    editingLink: Link | null
-    editUrl: string
+  // Edit Modal
+  editingLink: Link | null
+  editUrl: string
 }
 
 // API Base URL for the redirect service
-const API_BASE = 'https://api.qhrd.online'
+// Set VITE_API_URL=http://localhost:3000 in .env for local development
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.qhrd.online'
 
 // Storage keys
 const SESSION_KEY = 'toolbox_session'
 
 export function createQrGenerator(): HTMLElement {
-    // State
-    const state: State = {
-        session: loadSession(),
-        authOpen: false,
-        authTab: 'login',
-        authEmail: '',
-        authPassword: '',
-        authLoading: false,
-        authError: null,
+  // State
+  const state: State = {
+    session: loadSession(),
+    authOpen: false,
+    authTab: 'login',
+    authEmail: '',
+    authPassword: '',
+    authLoading: false,
+    authError: null,
 
-        activeTab: 'create',
+    activeTab: 'create',
 
-        targetUrl: '',
-        shortUrl: null,
-        hash: null,
-        qrDataUrl: null,
-        expiresAt: null,
-        isGenerating: false,
-        error: null,
-        copied: false,
+    targetUrl: '',
+    shortUrl: null,
+    hash: null,
+    qrDataUrl: null,
+    expiresAt: null,
+    isGenerating: false,
+    error: null,
+    copied: false,
 
-        links: [],
-        linksLoading: false,
+    links: [],
+    linksLoading: false,
 
-        editingLink: null,
-        editUrl: ''
+    editingLink: null,
+    editUrl: ''
+  }
+
+  // Create container
+  const container = document.createElement('div')
+  container.className = 'qr-generator fade-in'
+
+  // Load session from localStorage
+  function loadSession(): Session | null {
+    try {
+      const stored = localStorage.getItem(SESSION_KEY)
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
     }
+  }
 
-    // Create container
-    const container = document.createElement('div')
-    container.className = 'qr-generator fade-in'
-
-    // Load session from localStorage
-    function loadSession(): Session | null {
-        try {
-            const stored = localStorage.getItem(SESSION_KEY)
-            return stored ? JSON.parse(stored) : null
-        } catch {
-            return null
-        }
+  // Save session to localStorage
+  function saveSession(session: Session | null): void {
+    if (session) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    } else {
+      localStorage.removeItem(SESSION_KEY)
     }
+  }
 
-    // Save session to localStorage
-    function saveSession(session: Session | null): void {
-        if (session) {
-            localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-        } else {
-            localStorage.removeItem(SESSION_KEY)
-        }
-    }
-
-    // Render function
-    function render(): void {
-        container.innerHTML = `
+  // Render function
+  function render(): void {
+    container.innerHTML = `
       <!-- Auth Section -->
       <div class="auth-section">
         <div class="auth-header" id="auth-toggle">
           <div class="auth-header__left">
             ${icons.user}
             ${state.session
-                ? `<span>Eingeloggt als</span>`
-                : `<span>Login für unbegrenzte Links</span>`
-            }
+        ? `<span>Eingeloggt als</span>`
+        : `<span>Login für unbegrenzte Links</span>`
+      }
           </div>
           ${state.session ? `
             <div class="auth-user">
@@ -183,11 +184,11 @@ export function createQrGenerator(): HTMLElement {
       ${state.editingLink ? renderEditModal() : ''}
     `
 
-        attachEventListeners()
-    }
+    attachEventListeners()
+  }
 
-    function renderCreateTab(): string {
-        return `
+  function renderCreateTab(): string {
+    return `
       <!-- Create Link Section -->
       <div class="qr-input-section">
         <label class="settings__label">Ziel-URL eingeben</label>
@@ -201,9 +202,9 @@ export function createQrGenerator(): HTMLElement {
           >
           <button class="btn btn--primary" id="generate-btn" ${state.isGenerating ? 'disabled' : ''}>
             ${state.isGenerating
-                ? '<div class="spinner"></div>'
-                : `${icons.zap} Erstellen`
-            }
+        ? '<div class="spinner"></div>'
+        : `${icons.zap} Erstellen`
+      }
           </button>
         </div>
       </div>
@@ -255,39 +256,39 @@ export function createQrGenerator(): HTMLElement {
         </div>
       ` : ''}
     `
-    }
+  }
 
-    function renderMyLinksTab(): string {
-        if (!state.session) {
-            return `
+  function renderMyLinksTab(): string {
+    if (!state.session) {
+      return `
         <div class="links-empty">
           <p>Bitte logge dich ein, um deine Links zu verwalten.</p>
         </div>
       `
-        }
+    }
 
-        if (state.linksLoading) {
-            return `
+    if (state.linksLoading) {
+      return `
         <div class="links-empty">
           <div class="spinner"></div>
           <p>Lade Links...</p>
         </div>
       `
-        }
+    }
 
-        if (state.links.length === 0) {
-            return `
+    if (state.links.length === 0) {
+      return `
         <div class="links-empty">
           <p>Du hast noch keine Links erstellt.</p>
         </div>
       `
-        }
+    }
 
-        return `
+    return `
       <div class="links-dashboard">
         ${state.links.map(link => {
-            const isExpired = !link.isActive || new Date(link.expiresAt) < new Date()
-            return `
+      const isExpired = !link.isActive || new Date(link.expiresAt) < new Date()
+      return `
             <div class="link-item ${isExpired ? 'link-item--expired' : ''}">
               <div class="link-item__header">
                 <a href="${link.shortUrl}" target="_blank" rel="noopener" class="link-item__url">
@@ -315,15 +316,15 @@ export function createQrGenerator(): HTMLElement {
               </div>
             </div>
           `
-        }).join('')}
+    }).join('')}
       </div>
     `
-    }
+  }
 
-    function renderEditModal(): string {
-        if (!state.editingLink) return ''
+  function renderEditModal(): string {
+    if (!state.editingLink) return ''
 
-        return `
+    return `
       <div class="edit-modal" id="edit-modal">
         <div class="edit-modal__content">
           <h3 class="edit-modal__title">Link bearbeiten</h3>
@@ -351,425 +352,440 @@ export function createQrGenerator(): HTMLElement {
         </div>
       </div>
     `
-    }
+  }
 
-    function formatDate(dateStr: string): string {
-        const date = new Date(dateStr)
-        return date.toLocaleDateString('de-DE', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        })
-    }
+  function formatDate(dateStr: string): string {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
+  }
 
-    // Event listeners
-    function attachEventListeners(): void {
-        // Auth toggle
-        const authToggle = container.querySelector('#auth-toggle') as HTMLElement
-        authToggle?.addEventListener('click', (e) => {
-            // Don't toggle if clicking logout button
-            if ((e.target as HTMLElement).id === 'logout-btn') return
-            if (!state.session) {
-                state.authOpen = !state.authOpen
-                render()
-            }
-        })
+  // Event listeners
+  function attachEventListeners(): void {
+    // Auth toggle
+    const authToggle = container.querySelector('#auth-toggle') as HTMLElement
+    authToggle?.addEventListener('click', (e) => {
+      // Don't toggle if clicking logout button
+      if ((e.target as HTMLElement).id === 'logout-btn') return
+      if (!state.session) {
+        state.authOpen = !state.authOpen
+        render()
+      }
+    })
 
-        // Logout button
-        const logoutBtn = container.querySelector('#logout-btn') as HTMLButtonElement
-        logoutBtn?.addEventListener('click', (e) => {
-            e.stopPropagation()
-            handleLogout()
-        })
+    // Logout button
+    const logoutBtn = container.querySelector('#logout-btn') as HTMLButtonElement
+    logoutBtn?.addEventListener('click', (e) => {
+      e.stopPropagation()
+      handleLogout()
+    })
 
-        // Auth tabs
-        container.querySelectorAll('.auth-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                state.authTab = (tab as HTMLElement).dataset.tab as 'login' | 'register'
-                state.authError = null
-                render()
-            })
-        })
-
-        // Auth form
-        const authForm = container.querySelector('#auth-form') as HTMLFormElement
-        authForm?.addEventListener('submit', handleAuth)
-
-        const authEmailInput = container.querySelector('#auth-email') as HTMLInputElement
-        authEmailInput?.addEventListener('input', () => {
-            state.authEmail = authEmailInput.value
-        })
-
-        const authPasswordInput = container.querySelector('#auth-password') as HTMLInputElement
-        authPasswordInput?.addEventListener('input', () => {
-            state.authPassword = authPasswordInput.value
-        })
-
-        // Link tabs
-        container.querySelectorAll('.link-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const newTab = (tab as HTMLElement).dataset.linktab as 'create' | 'mylinks'
-                if (newTab === 'mylinks' && !state.session) return
-                state.activeTab = newTab
-                if (newTab === 'mylinks') {
-                    loadLinks()
-                }
-                render()
-            })
-        })
-
-        // URL input
-        const urlInput = container.querySelector('#url-input') as HTMLInputElement
-        urlInput?.addEventListener('input', () => {
-            state.targetUrl = urlInput.value
-        })
-        urlInput?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleGenerate()
-        })
-
-        // Generate button
-        const generateBtn = container.querySelector('#generate-btn') as HTMLButtonElement
-        generateBtn?.addEventListener('click', handleGenerate)
-
-        // Copy URL button
-        const copyUrlBtn = container.querySelector('#copy-url-btn') as HTMLButtonElement
-        copyUrlBtn?.addEventListener('click', () => {
-            if (state.shortUrl) {
-                navigator.clipboard.writeText(state.shortUrl)
-                state.copied = true
-                render()
-                setTimeout(() => {
-                    state.copied = false
-                    render()
-                }, 2000)
-            }
-        })
-
-        // Download PNG
-        const downloadPngBtn = container.querySelector('#download-png-btn') as HTMLButtonElement
-        downloadPngBtn?.addEventListener('click', handleDownloadPng)
-
-        // Copy QR
-        const copyQrBtn = container.querySelector('#copy-qr-btn') as HTMLButtonElement
-        copyQrBtn?.addEventListener('click', handleCopyQr)
-
-        // Reset
-        const resetBtn = container.querySelector('#reset-btn') as HTMLButtonElement
-        resetBtn?.addEventListener('click', () => {
-            state.targetUrl = ''
-            state.shortUrl = null
-            state.hash = null
-            state.qrDataUrl = null
-            state.expiresAt = null
-            state.error = null
-            render()
-        })
-
-        // Edit buttons
-        container.querySelectorAll('[data-edit]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const hash = (btn as HTMLElement).dataset.edit
-                const link = state.links.find(l => l.hash === hash)
-                if (link) {
-                    state.editingLink = link
-                    state.editUrl = link.targetUrl
-                    render()
-                }
-            })
-        })
-
-        // Delete buttons
-        container.querySelectorAll('[data-delete]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const hash = (btn as HTMLElement).dataset.delete
-                if (hash) handleDeleteLink(hash)
-            })
-        })
-
-        // Edit modal
-        const editModal = container.querySelector('#edit-modal') as HTMLElement
-        editModal?.addEventListener('click', (e) => {
-            if (e.target === editModal) {
-                state.editingLink = null
-                render()
-            }
-        })
-
-        const cancelEditBtn = container.querySelector('#cancel-edit-btn') as HTMLButtonElement
-        cancelEditBtn?.addEventListener('click', () => {
-            state.editingLink = null
-            render()
-        })
-
-        const editForm = container.querySelector('#edit-form') as HTMLFormElement
-        editForm?.addEventListener('submit', handleEditSubmit)
-
-        const editUrlInput = container.querySelector('#edit-url-input') as HTMLInputElement
-        editUrlInput?.addEventListener('input', () => {
-            state.editUrl = editUrlInput.value
-        })
-    }
-
-    // Auth handlers
-    async function handleAuth(e: Event): Promise<void> {
-        e.preventDefault()
-        if (state.authLoading) return
-
-        state.authLoading = true
+    // Auth tabs
+    container.querySelectorAll('.auth-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        state.authTab = (tab as HTMLElement).dataset.tab as 'login' | 'register'
         state.authError = null
         render()
+      })
+    })
 
-        try {
-            const endpoint = state.authTab === 'login' ? '/api/auth/login' : '/api/auth/register'
-            const response = await fetch(`${API_BASE}${endpoint}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: state.authEmail,
-                    password: state.authPassword
-                })
-            })
+    // Auth form
+    const authForm = container.querySelector('#auth-form') as HTMLFormElement
+    authForm?.addEventListener('submit', handleAuth)
 
-            const data = await response.json()
+    const authEmailInput = container.querySelector('#auth-email') as HTMLInputElement
+    authEmailInput?.addEventListener('input', () => {
+      state.authEmail = authEmailInput.value
+    })
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Authentifizierung fehlgeschlagen')
-            }
+    const authPasswordInput = container.querySelector('#auth-password') as HTMLInputElement
+    authPasswordInput?.addEventListener('input', () => {
+      state.authPassword = authPasswordInput.value
+    })
 
-            state.session = {
-                access_token: data.session.access_token,
-                user: {
-                    id: data.user.id,
-                    email: data.user.email
-                }
-            }
-            saveSession(state.session)
-            state.authOpen = false
-            state.authEmail = ''
-            state.authPassword = ''
-
-        } catch (error) {
-            state.authError = (error as Error).message
-        } finally {
-            state.authLoading = false
-            render()
+    // Link tabs
+    container.querySelectorAll('.link-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const newTab = (tab as HTMLElement).dataset.linktab as 'create' | 'mylinks'
+        if (newTab === 'mylinks' && !state.session) return
+        state.activeTab = newTab
+        if (newTab === 'mylinks') {
+          loadLinks()
         }
-    }
-
-    async function handleLogout(): Promise<void> {
-        state.session = null
-        saveSession(null)
-        state.links = []
-        state.activeTab = 'create'
         render()
-    }
+      })
+    })
 
-    // Load user links
-    async function loadLinks(): Promise<void> {
-        if (!state.session) return
+    // URL input
+    const urlInput = container.querySelector('#url-input') as HTMLInputElement
+    urlInput?.addEventListener('input', () => {
+      state.targetUrl = urlInput.value
+    })
+    urlInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleGenerate()
+    })
 
-        state.linksLoading = true
+    // Generate button
+    const generateBtn = container.querySelector('#generate-btn') as HTMLButtonElement
+    generateBtn?.addEventListener('click', handleGenerate)
+
+    // Copy URL button
+    const copyUrlBtn = container.querySelector('#copy-url-btn') as HTMLButtonElement
+    copyUrlBtn?.addEventListener('click', () => {
+      if (state.shortUrl) {
+        navigator.clipboard.writeText(state.shortUrl)
+        state.copied = true
         render()
-
-        try {
-            const response = await fetch(`${API_BASE}/api/links`, {
-                headers: {
-                    'Authorization': `Bearer ${state.session.access_token}`
-                }
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Fehler beim Laden')
-            }
-
-            state.links = data.links
-
-        } catch (error) {
-            console.error('Load links error:', error)
-            state.links = []
-        } finally {
-            state.linksLoading = false
-            render()
-        }
-    }
-
-    // Generate link
-    async function handleGenerate(): Promise<void> {
-        if (!state.targetUrl || state.isGenerating) return
-
-        // Validate URL
-        try {
-            new URL(state.targetUrl)
-        } catch {
-            state.error = 'Bitte gib eine gültige URL ein (z.B. https://example.com)'
-            render()
-            return
-        }
-
-        state.isGenerating = true
-        state.error = null
-        render()
-
-        try {
-            const headers: Record<string, string> = {
-                'Content-Type': 'application/json'
-            }
-
-            if (state.session) {
-                headers['Authorization'] = `Bearer ${state.session.access_token}`
-            }
-
-            const response = await fetch(`${API_BASE}/api/create`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ url: state.targetUrl })
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Fehler beim Erstellen')
-            }
-
-            state.hash = data.hash
-            state.shortUrl = data.shortUrl
-            state.expiresAt = data.expiresAt
-
-            // Generate QR code
-            const qrDataUrl = await generateQrCode(data.shortUrl)
-            state.qrDataUrl = qrDataUrl
-
-        } catch (error) {
-            console.error('Error:', error)
-            state.error = (error as Error).message || 'Fehler beim Generieren. Bitte versuche es erneut.'
-        } finally {
-            state.isGenerating = false
-            render()
-        }
-    }
-
-    // Edit link
-    async function handleEditSubmit(e: Event): Promise<void> {
-        e.preventDefault()
-        if (!state.editingLink || !state.session) return
-
-        try {
-            new URL(state.editUrl)
-        } catch {
-            return
-        }
-
-        try {
-            const response = await fetch(`${API_BASE}/api/links/${state.editingLink.hash}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${state.session.access_token}`
-                },
-                body: JSON.stringify({ url: state.editUrl })
-            })
-
-            if (!response.ok) {
-                const data = await response.json()
-                throw new Error(data.error || 'Fehler beim Speichern')
-            }
-
-            state.editingLink = null
-            await loadLinks()
-
-        } catch (error) {
-            console.error('Edit error:', error)
-        }
-    }
-
-    // Delete link
-    async function handleDeleteLink(hash: string): Promise<void> {
-        if (!state.session) return
-
-        try {
-            const response = await fetch(`${API_BASE}/api/links/${hash}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${state.session.access_token}`
-                }
-            })
-
-            if (!response.ok) {
-                const data = await response.json()
-                throw new Error(data.error || 'Fehler beim Löschen')
-            }
-
-            state.links = state.links.filter(l => l.hash !== hash)
-            render()
-
-        } catch (error) {
-            console.error('Delete error:', error)
-        }
-    }
-
-    // Generate QR code using canvas
-    async function generateQrCode(text: string): Promise<string> {
-        // @ts-expect-error - QRCode is loaded globally
-        if (typeof QRCode !== 'undefined') {
-            return new Promise((resolve, reject) => {
-                const canvas = document.createElement('canvas')
-                // @ts-expect-error - QRCode is loaded globally
-                QRCode.toCanvas(canvas, text, {
-                    width: 300,
-                    margin: 2,
-                    color: {
-                        dark: '#ffffff',
-                        light: '#000000'
-                    }
-                }, (error: Error | null) => {
-                    if (error) reject(error)
-                    else resolve(canvas.toDataURL('image/png'))
-                })
-            })
-        }
-
-        // Fallback: Use API
-        const size = 300
-        return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=000000&color=ffffff`
-    }
+        setTimeout(() => {
+          state.copied = false
+          render()
+        }, 2000)
+      }
+    })
 
     // Download PNG
-    async function handleDownloadPng(): Promise<void> {
-        if (!state.qrDataUrl) return
+    const downloadPngBtn = container.querySelector('#download-png-btn') as HTMLButtonElement
+    downloadPngBtn?.addEventListener('click', handleDownloadPng)
 
-        const link = document.createElement('a')
-        link.download = `qr-${state.hash}.png`
-        link.href = state.qrDataUrl
-        link.click()
-    }
+    // Copy QR
+    const copyQrBtn = container.querySelector('#copy-qr-btn') as HTMLButtonElement
+    copyQrBtn?.addEventListener('click', handleCopyQr)
 
-    // Copy QR to clipboard
-    async function handleCopyQr(): Promise<void> {
-        if (!state.qrDataUrl) return
+    // Reset
+    const resetBtn = container.querySelector('#reset-btn') as HTMLButtonElement
+    resetBtn?.addEventListener('click', () => {
+      state.targetUrl = ''
+      state.shortUrl = null
+      state.hash = null
+      state.qrDataUrl = null
+      state.expiresAt = null
+      state.error = null
+      render()
+    })
 
-        try {
-            const response = await fetch(state.qrDataUrl)
-            const blob = await response.blob()
-            await navigator.clipboard.write([
-                new ClipboardItem({ [blob.type]: blob })
-            ])
-        } catch {
-            state.error = 'QR-Code kopieren wird von diesem Browser nicht unterstützt'
-            render()
+    // Edit buttons
+    container.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const hash = (btn as HTMLElement).dataset.edit
+        const link = state.links.find(l => l.hash === hash)
+        if (link) {
+          state.editingLink = link
+          state.editUrl = link.targetUrl
+          render()
         }
-    }
+      })
+    })
 
-    // Escape HTML
-    function escapeHtml(text: string): string {
-        const div = document.createElement('div')
-        div.textContent = text
-        return div.innerHTML
-    }
+    // Delete buttons
+    container.querySelectorAll('[data-delete]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const hash = (btn as HTMLElement).dataset.delete
+        if (hash) handleDeleteLink(hash)
+      })
+    })
 
-    // Initial render
+    // Edit modal
+    const editModal = container.querySelector('#edit-modal') as HTMLElement
+    editModal?.addEventListener('click', (e) => {
+      if (e.target === editModal) {
+        state.editingLink = null
+        render()
+      }
+    })
+
+    const cancelEditBtn = container.querySelector('#cancel-edit-btn') as HTMLButtonElement
+    cancelEditBtn?.addEventListener('click', () => {
+      state.editingLink = null
+      render()
+    })
+
+    const editForm = container.querySelector('#edit-form') as HTMLFormElement
+    editForm?.addEventListener('submit', handleEditSubmit)
+
+    const editUrlInput = container.querySelector('#edit-url-input') as HTMLInputElement
+    editUrlInput?.addEventListener('input', () => {
+      state.editUrl = editUrlInput.value
+    })
+  }
+
+  // Auth handlers
+  async function handleAuth(e: Event): Promise<void> {
+    e.preventDefault()
+    if (state.authLoading) return
+
+    state.authLoading = true
+    state.authError = null
     render()
 
-    return container
+    try {
+      const endpoint = state.authTab === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: state.authEmail,
+          password: state.authPassword
+        })
+      })
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server nicht erreichbar. Bitte später erneut versuchen.')
+      }
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Authentifizierung fehlgeschlagen')
+      }
+
+      if (!data.session || !data.user) {
+        throw new Error('Ungültige Server-Antwort')
+      }
+
+      state.session = {
+        access_token: data.session.access_token,
+        user: {
+          id: data.user.id,
+          email: data.user.email
+        }
+      }
+      saveSession(state.session)
+      state.authOpen = false
+      state.authEmail = ''
+      state.authPassword = ''
+
+    } catch (error) {
+      const errorMessage = (error as Error).message
+      if (errorMessage.includes("Unexpected token '<'") || errorMessage.includes('Unexpected token')) {
+        state.authError = 'Server nicht erreichbar. Bitte stelle sicher, dass der Server läuft.'
+      } else {
+        state.authError = errorMessage
+      }
+    } finally {
+      state.authLoading = false
+      render()
+    }
+  }
+
+  async function handleLogout(): Promise<void> {
+    state.session = null
+    saveSession(null)
+    state.links = []
+    state.activeTab = 'create'
+    render()
+  }
+
+  // Load user links
+  async function loadLinks(): Promise<void> {
+    if (!state.session) return
+
+    state.linksLoading = true
+    render()
+
+    try {
+      const response = await fetch(`${API_BASE}/api/links`, {
+        headers: {
+          'Authorization': `Bearer ${state.session.access_token}`
+        }
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Laden')
+      }
+
+      state.links = data.links
+
+    } catch (error) {
+      console.error('Load links error:', error)
+      state.links = []
+    } finally {
+      state.linksLoading = false
+      render()
+    }
+  }
+
+  // Generate link
+  async function handleGenerate(): Promise<void> {
+    if (!state.targetUrl || state.isGenerating) return
+
+    // Validate URL
+    try {
+      new URL(state.targetUrl)
+    } catch {
+      state.error = 'Bitte gib eine gültige URL ein (z.B. https://example.com)'
+      render()
+      return
+    }
+
+    state.isGenerating = true
+    state.error = null
+    render()
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+
+      if (state.session) {
+        headers['Authorization'] = `Bearer ${state.session.access_token}`
+      }
+
+      const response = await fetch(`${API_BASE}/api/create`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ url: state.targetUrl })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Fehler beim Erstellen')
+      }
+
+      state.hash = data.hash
+      state.shortUrl = data.shortUrl
+      state.expiresAt = data.expiresAt
+
+      // Generate QR code
+      const qrDataUrl = await generateQrCode(data.shortUrl)
+      state.qrDataUrl = qrDataUrl
+
+    } catch (error) {
+      console.error('Error:', error)
+      state.error = (error as Error).message || 'Fehler beim Generieren. Bitte versuche es erneut.'
+    } finally {
+      state.isGenerating = false
+      render()
+    }
+  }
+
+  // Edit link
+  async function handleEditSubmit(e: Event): Promise<void> {
+    e.preventDefault()
+    if (!state.editingLink || !state.session) return
+
+    try {
+      new URL(state.editUrl)
+    } catch {
+      return
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/links/${state.editingLink.hash}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${state.session.access_token}`
+        },
+        body: JSON.stringify({ url: state.editUrl })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Fehler beim Speichern')
+      }
+
+      state.editingLink = null
+      await loadLinks()
+
+    } catch (error) {
+      console.error('Edit error:', error)
+    }
+  }
+
+  // Delete link
+  async function handleDeleteLink(hash: string): Promise<void> {
+    if (!state.session) return
+
+    try {
+      const response = await fetch(`${API_BASE}/api/links/${hash}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${state.session.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Fehler beim Löschen')
+      }
+
+      state.links = state.links.filter(l => l.hash !== hash)
+      render()
+
+    } catch (error) {
+      console.error('Delete error:', error)
+    }
+  }
+
+  // Generate QR code using canvas
+  async function generateQrCode(text: string): Promise<string> {
+    // @ts-expect-error - QRCode is loaded globally
+    if (typeof QRCode !== 'undefined') {
+      return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas')
+        // @ts-expect-error - QRCode is loaded globally
+        QRCode.toCanvas(canvas, text, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#ffffff',
+            light: '#000000'
+          }
+        }, (error: Error | null) => {
+          if (error) reject(error)
+          else resolve(canvas.toDataURL('image/png'))
+        })
+      })
+    }
+
+    // Fallback: Use API
+    const size = 300
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=000000&color=ffffff`
+  }
+
+  // Download PNG
+  async function handleDownloadPng(): Promise<void> {
+    if (!state.qrDataUrl) return
+
+    const link = document.createElement('a')
+    link.download = `qr-${state.hash}.png`
+    link.href = state.qrDataUrl
+    link.click()
+  }
+
+  // Copy QR to clipboard
+  async function handleCopyQr(): Promise<void> {
+    if (!state.qrDataUrl) return
+
+    try {
+      const response = await fetch(state.qrDataUrl)
+      const blob = await response.blob()
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ])
+    } catch {
+      state.error = 'QR-Code kopieren wird von diesem Browser nicht unterstützt'
+      render()
+    }
+  }
+
+  // Escape HTML
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
+  }
+
+  // Initial render
+  render()
+
+  return container
 }
