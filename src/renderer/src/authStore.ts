@@ -59,6 +59,17 @@ class AuthStore {
                 this.session = null
                 this.saveSession()
                 this.notifyListeners()
+            } else {
+                // Update local user data with fresh server data
+                const data = await response.json()
+                if (data.user && this.session) {
+                    this.session.user = {
+                        id: data.user.id,
+                        email: data.user.email
+                    }
+                    this.saveSession()
+                    this.notifyListeners()
+                }
             }
         } catch (error) {
             console.error('Token validation error:', error)
@@ -205,7 +216,7 @@ class AuthStore {
     }
 
     // Account Management
-    async changePassword(password: string): Promise<{ success: boolean; error?: string }> {
+    async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
         if (!this.session) return { success: false, error: 'Nicht eingeloggt' }
         try {
             const response = await fetch(`${API_BASE}/api/auth/change-password`, {
@@ -214,7 +225,7 @@ class AuthStore {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.session.access_token}`
                 },
-                body: JSON.stringify({ password })
+                body: JSON.stringify({ currentPassword, newPassword })
             })
             const data = await response.json()
             return response.ok ? { success: true } : { success: false, error: data.error }
@@ -223,7 +234,7 @@ class AuthStore {
         }
     }
 
-    async changeEmail(email: string): Promise<{ success: boolean; error?: string }> {
+    async changeEmail(currentPassword: string, email: string): Promise<{ success: boolean; error?: string }> {
         if (!this.session) return { success: false, error: 'Nicht eingeloggt' }
         try {
             const response = await fetch(`${API_BASE}/api/auth/change-email`, {
@@ -232,7 +243,7 @@ class AuthStore {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.session.access_token}`
                 },
-                body: JSON.stringify({ email })
+                body: JSON.stringify({ currentPassword, email })
             })
             const data = await response.json()
             if (response.ok) {

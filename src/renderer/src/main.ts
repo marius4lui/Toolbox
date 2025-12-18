@@ -314,19 +314,192 @@ class ToolboxApp {
           <p class="account-id">ID: ${user.id.slice(0, 8)}...</p>
           
           <div class="account-actions">
-            <button class="btn btn--secondary btn--danger" id="btn-logout">
+            <button class="btn btn--secondary" id="btn-change-pwd">
+              Passwort ändern
+            </button>
+            <button class="btn btn--secondary" id="btn-change-email">
+              E-Mail ändern
+            </button>
+            <button class="btn btn--secondary btn--danger" id="btn-delete-account">
+              Konto löschen
+            </button>
+            <div class="separator"></div>
+            <button class="btn btn--secondary" id="btn-logout">
               Ausloggen
             </button>
           </div>
         </div>
       </div>
+      <style>
+        .separator {
+          height: 1px;
+          background: var(--border-primary);
+          margin: 0.5rem 0;
+          width: 100%;
+        }
+      </style>
     `
 
+    // Event Listeners
     this.mainContent.querySelector('#btn-logout')?.addEventListener('click', () => {
       authStore.logout()
       if (toolRegistry.length > 0) {
         this.navigateToTool(toolRegistry[0].id)
       }
+    })
+
+    this.mainContent.querySelector('#btn-change-pwd')?.addEventListener('click', () => {
+      this.showReauthModal({
+        title: 'Passwort ändern',
+        fields: [
+          { label: 'Aktuelles Passwort', type: 'password', id: 'current-pwd', placeholder: '••••••••' },
+          { label: 'Neues Passwort', type: 'password', id: 'new-pwd', placeholder: 'Neues Passwort' }
+        ],
+        confirmText: 'Passwort ändern',
+        onConfirm: async (values) => {
+          const current = values['current-pwd']
+          const newPwd = values['new-pwd']
+          if (!current || !newPwd) {
+            alert('Bitte beide Felder ausfüllen')
+            return false
+          }
+
+          const res = await authStore.changePassword(current, newPwd)
+          if (res.success) {
+            alert('Passwort erfolgreich geändert!')
+            return true
+          } else {
+            alert('Fehler: ' + res.error)
+            return false
+          }
+        }
+      })
+    })
+
+    this.mainContent.querySelector('#btn-change-email')?.addEventListener('click', () => {
+      this.showReauthModal({
+        title: 'E-Mail ändern',
+        fields: [
+          { label: 'Aktuelles Passwort', type: 'password', id: 'current-pwd', placeholder: '••••••••' },
+          { label: 'Neue E-Mail', type: 'email', id: 'new-email', placeholder: 'neue.email@example.com' }
+        ],
+        confirmText: 'E-Mail ändern',
+        onConfirm: async (values) => {
+          const current = values['current-pwd']
+          const newEmail = values['new-email']
+          if (!current || !newEmail) {
+            alert('Bitte beide Felder ausfüllen')
+            return false
+          }
+
+          const res = await authStore.changeEmail(current, newEmail)
+          if (res.success) {
+            alert('Bestätigungs-Link gesendet! Bitte prüfe dein Postfach.')
+            return true
+          } else {
+            alert('Fehler: ' + res.error)
+            return false
+          }
+        }
+      })
+    })
+
+    this.mainContent.querySelector('#btn-delete-account')?.addEventListener('click', async () => {
+      // Use native confirm for critical destructive actions as it's safer/harder to miss
+      const confirm1 = confirm('ACHTUNG: Möchtest du dein Konto wirklich löschen? Dies kann nicht rückgängig gemacht werden!')
+      if (!confirm1) return
+
+      const confirm2 = confirm('Bist du absolut sicher? Alle deine Daten und Links werden unwiderruflich gelöscht.')
+      if (!confirm2) return
+
+      const res = await authStore.deleteAccount()
+      if (res.success) {
+        alert('Dein Konto wurde gelöscht.')
+        if (toolRegistry.length > 0) {
+          this.navigateToTool(toolRegistry[0].id)
+        }
+      } else {
+        alert('Fehler beim Löschen: ' + res.error)
+      }
+    })
+  }
+
+  // Generalized Modal for Re-Authentication Actions
+  private showReauthModal(options: {
+    title: string
+    fields: Array<{ label: string; type: string; id: string; placeholder?: string }>
+    confirmText: string
+    onConfirm: (values: Record<string, string>) => Promise<boolean>
+  }): void {
+    const modal = document.createElement('div')
+    modal.className = 'edit-modal fade-in'
+
+    const fieldsHtml = options.fields.map(field => `
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <label style="font-size:13px;color:var(--text-secondary);">${field.label}</label>
+        <input type="${field.type}" class="auth-input" id="${field.id}" placeholder="${field.placeholder || ''}" style="width:100%">
+      </div>
+    `).join('')
+
+    modal.innerHTML = `
+      <div class="edit-modal__content">
+        <h3 class="edit-modal__title">${options.title}</h3>
+        <div class="edit-modal__form">
+          ${fieldsHtml}
+          <div class="edit-modal__actions">
+            <button class="btn btn--secondary" id="modal-cancel">Abbrechen</button>
+            <button class="btn btn--primary" id="modal-confirm">${options.confirmText}</button>
+          </div>
+        </div>
+      </div>
+    `
+
+    this.container.appendChild(modal)
+
+    // Focus first input
+    setTimeout(() => {
+      const firstInput = modal.querySelector('input')
+      if (firstInput) firstInput.focus()
+    }, 50)
+
+    const close = () => modal.remove()
+
+    const submit = async () => {
+      const values: Record<string, string> = {}
+      options.fields.forEach(field => {
+        const input = modal.querySelector(`#${field.id}`) as HTMLInputElement
+        values[field.id] = input.value
+      })
+
+      const confirmBtn = modal.querySelector('#modal-confirm') as HTMLButtonElement
+      confirmBtn.disabled = true
+      const originalText = confirmBtn.textContent
+      confirmBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;"></div>'
+
+      const success = await options.onConfirm(values)
+
+      if (success) {
+        close()
+      } else {
+        confirmBtn.disabled = false
+        confirmBtn.textContent = originalText
+      }
+    }
+
+    modal.querySelector('#modal-cancel')?.addEventListener('click', close)
+    modal.querySelector('#modal-confirm')?.addEventListener('click', submit)
+
+    // Allow Enter key to submit
+    modal.querySelectorAll('input').forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submit()
+        if (e.key === 'Escape') close()
+      })
+    })
+
+    // ID-based close on outside click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) close()
     })
   }
 

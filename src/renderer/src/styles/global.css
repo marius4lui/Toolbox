@@ -148,6 +148,15 @@ body {
   user-select: none;
 }
 
+/* Ensure interactive elements are always clickable */
+input,
+button,
+select,
+textarea,
+a {
+  -webkit-app-region: no-drag;
+}
+
 .titlebar__brand {
   display: flex;
   align-items: center;
@@ -1444,5 +1453,12 @@ body {
 
 .account-actions {
   display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.account-actions .btn {
+  width: 100%;
   justify-content: center;
 }
