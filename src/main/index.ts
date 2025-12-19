@@ -1,9 +1,11 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import sharp from 'sharp'
 import { readFile, writeFile } from 'fs/promises'
 import Store from 'electron-store'
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const sharp = require('sharp')
 
 const store = new Store({
     defaults: {

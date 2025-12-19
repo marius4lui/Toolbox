@@ -3,9 +3,10 @@ import { resolve } from 'path'
 
 export default defineConfig({
     main: {
-        plugins: [externalizeDepsPlugin()],
+        plugins: [externalizeDepsPlugin({ exclude: ['electron-store'] })],
         build: {
             rollupOptions: {
+                external: ['detect-libc', 'sharp'],
                 input: {
                     index: resolve(__dirname, 'src/main/index.ts')
                 }
