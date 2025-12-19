@@ -1,6 +1,6 @@
 {
   "name": "toolbox",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "A modern toolbox desktop application with image compressor and more utilities",
   "main": "./out/main/index.js",
   "author": "Sebastian",
@@ -16,6 +16,7 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
+    "detect-libc": "^2.0.3",
     "electron-store": "8.2.0",
     "sharp": "^0.33.5"
   },
@@ -31,6 +32,10 @@
   "build": {
     "appId": "com.toolbox.app",
     "productName": "Toolbox",
+    "asarUnpack": [
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@img/**/*"
+    ],
     "directories": {
       "output": "dist"
     },
