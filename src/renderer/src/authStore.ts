@@ -1,7 +1,7 @@
 // Global Auth Store for Toolbox
 // Manages authentication state across all tools
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.qhrd.online'
+const API_BASE = 'https://api.qhrd.online'
 const SESSION_KEY = 'toolbox_session'
 
 export interface User {

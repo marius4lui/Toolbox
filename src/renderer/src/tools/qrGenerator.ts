@@ -37,7 +37,7 @@ interface State {
 
 // API Base URL for the redirect service
 // Set VITE_API_URL=http://localhost:3000 in .env for local development
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.qhrd.online'
+const API_BASE = 'https://api.qhrd.online'
 
 export function createQrGenerator(): HTMLElement {
   // State (auth now comes from global authStore)

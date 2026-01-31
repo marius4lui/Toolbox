@@ -38,7 +38,7 @@ interface State {
 }
 
 // API Base URL for the redirect service
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.qhrd.online'
+const API_BASE = 'https://api.qhrd.online'
 
 export function createLinkShortener(): HTMLElement {
   const state: State = {
